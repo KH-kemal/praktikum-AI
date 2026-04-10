@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sistem Pakar Gastro Usus</title>
+    <style>
+        body {
+            margin: 0;
+            background: #d9d9d9;
+            font-family: Tahoma, Arial, sans-serif;
+            color: #111;
+        }
+        .window {
+            width: min(1180px, calc(100vw - 24px));
+            height: min(760px, calc(100vh - 24px));
+            margin: 12px auto;
+            border: 1px solid #777;
+            background: #f2f2f2;
+            display: grid;
+            grid-template-columns: 64% 36%;
+            grid-template-rows: 1fr auto;
+            gap: 0;
+        }
+        .left {
+            background: #fff44d;
+            border-right: 1px solid #8a8a8a;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .left .list {
+            overflow-y: auto;
+            padding: 8px 10px 10px;
+        }
+        .right {
+            background: #efefef;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .right .result {
+            white-space: pre-wrap;
+            font-size: 26px;
+            line-height: 1.36;
+            padding: 10px 12px;
+            overflow-y: auto;
+            margin: 0;
+            font-family: Tahoma, Arial, sans-serif;
+        }
+        .bottom {
+            grid-column: 1 / span 2;
+            border-top: 1px solid #8a8a8a;
+            background: #ddd;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            font-size: 24px;
+            flex-wrap: wrap;
+        }
+        .spacer {
+            flex: 1;
+        }
+        .diagnosis {
+            color: #b10000;
+            font-weight: bold;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 3px 0;
+            font-size: 23px;
+        }
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #d9d9d9;
+        }
+        input[type="number"] {
+            width: 70px;
+            height: 34px;
+            font-size: 22px;
+            padding: 2px 4px;
+        }
+        button {
+            font-size: 22px;
+            padding: 4px 14px;
+            cursor: pointer;
+        }
+        @media (max-width: 900px) {
+            .window {
+                height: auto;
+                grid-template-columns: 1fr;
+                grid-template-rows: 56vh 32vh auto;
+            }
+            .bottom {
+                grid-column: 1;
+                font-size: 18px;
+            }
+            .row { font-size: 16px; }
+            .right .result { font-size: 16px; }
+            button, input[type="number"] { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="window">
+        <section class="left">
+            <div id="list" class="list"></div>
+        </section>
+        <section class="right">
+            <pre id="result" class="result">Pilih gejala lalu klik Proses.</pre>
+        </section>
+        <section class="bottom">
+            <span>Threshold</span>
+            <input id="threshold" type="number" min="0" max="100" value="30">
+            <span>%</span>
+            <button id="proses" type="button">Proses</button>
+            <span class="spacer"></span>
+            <span>Anda terkena infeksi:</span>
+            <span id="top" class="diagnosis">-</span>
+        </section>
+    </div>
+
+    <script>
+        const GEJALA = {"G01": "Apakah Anda sering buang air besar (lebih dari 2 kali)?", "G02": "Apakah Anda mengalami berak encer (mencret)?", "G03": "Apakah Anda mengalami berak berdarah?", "G04": "Apakah Anda merasa lesu dan tidak bergairah?", "G05": "Apakah Anda tidak selera makan?", "G06": "Apakah Anda merasa mual dan sering muntah (lebih dari 1 kali)?", "G07": "Apakah Anda merasa sakit di bagian perut?", "G08": "Apakah tekanan darah Anda rendah?", "G09": "Apakah Anda merasa pusing?", "G10": "Apakah Anda pernah pingsan?", "G11": "Apakah suhu badan Anda tinggi (demam)?", "G12": "Apakah Anda memiliki luka di bagian tertentu?", "G13": "Apakah Anda tidak dapat menggerakkan anggota badan tertentu (lumpuh)?", "G14": "Apakah Anda baru saja memakan sesuatu yang mencurigakan?", "G15": "Apakah Anda memakan daging (terutama daging yang tidak dimasak sempurna)?", "G16": "Apakah Anda memakan jamur?", "G17": "Apakah Anda memakan makanan kaleng?", "G18": "Apakah Anda membeli atau meminum susu?"};
+        const RULES = {"P33": {"nama": "Keracunan Staphylococcus aureus", "deskripsi": "Keracunan yang disebabkan oleh toksin bakteri Staphylococcus aureus pada makanan. Biasanya terjadi 1-6 jam setelah makan makanan yang terkontaminasi.", "gejala_utama": ["G06", "G07", "G14"], "gejala_pendukung": ["G01", "G02", "G04", "G05", "G08", "G09"], "saran": "Istirahat, minum banyak cairan untuk cegah dehidrasi. Jika muntah berlebihan, segera ke dokter."}, "P34": {"nama": "Keracunan Jamur Beracun", "deskripsi": "Keracunan akibat memakan jamur beracun. Gejalanya dapat muncul beberapa jam hingga beberapa hari setelah konsumsi.", "gejala_utama": ["G16", "G06", "G07"], "gejala_pendukung": ["G01", "G02", "G04", "G05", "G08", "G09", "G10", "G11"], "saran": "SEGERA ke UGD rumah sakit! Keracunan jamur bisa berbahaya. Bawa sisa jamur yang dimakan jika ada."}, "P35": {"nama": "Keracunan Salmonellae", "deskripsi": "Infeksi bakteri Salmonella yang sering berasal dari daging, telur, atau produk susu yang tidak matang/tidak higienis.", "gejala_utama": ["G15", "G01", "G11"], "gejala_pendukung": ["G02", "G03", "G06", "G07", "G04", "G08", "G12"], "saran": "Konsumsi oralit untuk mencegah dehidrasi, istirahat cukup. Segera ke dokter jika ada darah pada tinja atau demam tinggi."}, "P36": {"nama": "Keracunan Clostridium botulinum", "deskripsi": "Keracunan serius akibat toksin bakteri Clostridium botulinum yang umumnya berasal dari makanan kaleng yang tidak diproses dengan benar.", "gejala_utama": ["G17", "G13", "G06"], "gejala_pendukung": ["G01", "G07", "G08", "G09", "G10", "G04", "G05"], "saran": "DARURAT MEDIS! Segera ke IGD. Clostridium botulinum dapat menyebabkan kelumpuhan pernapasan yang mengancam jiwa."}, "P37": {"nama": "Keracunan Campylobacter", "deskripsi": "Infeksi bakteri Campylobacter, umumnya dari produk susu mentah atau unggas yang tidak dimasak sempurna.", "gejala_utama": ["G18", "G03", "G11"], "gejala_pendukung": ["G01", "G02", "G07", "G04", "G06", "G09"], "saran": "Istirahat, jaga hidrasi. Konsultasi dokter untuk pemberian antibiotik jika diperlukan."}};
+
+        const listEl = document.getElementById('list');
+        const resultEl = document.getElementById('result');
+        const topEl = document.getElementById('top');
+
+        function renderGejala() {
+            Object.entries(GEJALA).forEach(([kode, pertanyaan]) => {
+                const row = document.createElement('label');
+                row.className = 'row';
+                row.innerHTML = `<input type="checkbox" data-kode="${kode}"> <span>${pertanyaan}</span>`;
+                listEl.appendChild(row);
+            });
+        }
+
+        function hitungConfidence(fakta, rule) {
+            const utama = new Set(rule.gejala_utama);
+            const pendukung = new Set(rule.gejala_pendukung);
+            const skorMax = (utama.size * 2) + pendukung.size;
+            let skor = 0;
+            fakta.forEach((kode) => {
+                if (utama.has(kode)) skor += 2;
+                else if (pendukung.has(kode)) skor += 1;
+            });
+            if (skorMax === 0) return 0;
+            return Number(((skor / skorMax) * 100).toFixed(2));
+        }
+
+        function proses() {
+            const threshold = Number(document.getElementById('threshold').value);
+            if (Number.isNaN(threshold) || threshold < 0 || threshold > 100) {
+                alert('Threshold harus angka 0-100.');
+                return;
+            }
+
+            const fakta = new Set(
+                Array.from(document.querySelectorAll('input[data-kode]:checked')).map((el) => el.dataset.kode)
+            );
+
+            const hasil = Object.entries(RULES).map(([kode, rule]) => {
+                const confidence = hitungConfidence(fakta, rule);
+                return { kode, nama: rule.nama, confidence };
+            }).sort((a, b) => b.confidence - a.confidence);
+
+            const lines = hasil.map((h) => `${h.nama.replace('Keracunan ', '')} : ${h.confidence.toFixed(2)} %`);
+            resultEl.textContent = lines.join('\n');
+
+            const top = hasil.find((h) => h.confidence >= threshold);
+            topEl.textContent = top ? top.nama : 'Tidak terdeteksi';
+        }
+
+        document.getElementById('proses').addEventListener('click', proses);
+        renderGejala();
+    </script>
+</body>
+</html>
